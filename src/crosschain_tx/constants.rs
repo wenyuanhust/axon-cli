@@ -15,6 +15,36 @@ pub const SUDT_CS_SIZE: usize = 16;
 /// "TYPE_ID" in hex (copied from ckb-chain-spec)
 pub const TYPE_ID_CODE_HASH: H256 = h256!("0x545950455f4944");
 
+// {
+// "code_hash":
+// "0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4",
+// "hash_type": "type",
+// "out_point": {
+// "tx_hash":
+// "0xe12877ebd2c3c364dc46c5c992bcfaf4fee33fa13eebdf82c591fc9825aab769",
+// "index": "0x0"
+// },
+// "dep_type": "code"
+// }
+
+// sudt type script
+pub const SUDT_TYPE_SCRIPT_CODE_HASH: H256 =
+    h256!("0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4");
+pub const SUDT_TYPE_SCRIPT_TX_HASH: H256 =
+    h256!("0xe12877ebd2c3c364dc46c5c992bcfaf4fee33fa13eebdf82c591fc9825aab769");
+
+// xUDT type script
+pub const XUDT_TYPE_SCRIPT_CODE_HASH: H256 =
+    h256!("0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb");
+pub const XUDT_TYPE_SCRIPT_TX_HASH: H256 =
+    h256!("0xd99fd4cc59477273e1cf01df14b80bf5fd83b2e68af3807aa5dece284a74fd12");
+
+// xUDT cap type script, needs to deploy xUDT cap script first
+pub const XUDT_CAP_SCRIPT_CODE_HASH: H256 =
+    h256!("0xd99fd4cc59477273e1cf01df14b80bf5fd83b2e68af3807aa5dece284a74fd12");
+pub const XUDT_CAP_SCRIPT_TX_HASH: H256 =
+    h256!("0xd99fd4cc59477273e1cf01df14b80bf5fd83b2e68af3807aa5dece284a74fd12");
+
 // testnet, secp256k1
 pub const SECP256K1_BLAKE160_CODE_HASH: H256 =
     h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8");

@@ -102,7 +102,9 @@ impl SubCommand for CrossChain {
                     .long("ckb-rpc")
                     .help("CKB rpc url")
                     .required(false)
-                    .default_value("http://3.235.223.161:18114")
+                    // get from https://www.notion.so/cryptape/rpc-980575b006db4e889154198c84fa85d6#5a7bbdd1efa0444980c3767f17b4bc2b
+                    // or https://github.com/nervosnetwork/ckb/wiki/Public-JSON-RPC-nodes
+                    .default_value("https://testnet.ckb.dev")
                     .takes_value(true),
             )
             .arg(
@@ -111,7 +113,7 @@ impl SubCommand for CrossChain {
                     .long("ckb-indexer")
                     .help("CKB indexer rpc url")
                     .required(false)
-                    .default_value("http://3.235.223.161:18116")
+                    .default_value("https://testnet.ckb.dev/indexer")
                     .takes_value(true),
             )
             .arg(
@@ -171,14 +173,19 @@ impl SubCommand for CrossChain {
 
         let create_tx = || {
             if args.tx_type == 0 {
-                println!("deploy crosschain metadata");
-                CrossChain::build_deploy_crosschain_metadata_tx(&args, sender, secp256k1_data_dep)
+                println!("deploy xUDT");
+                CrossChain::build_deploy_xudt_tx(&args, sender, secp256k1_data_dep)
             } else if args.tx_type == 1 {
+                println!("deploy sUDT");
+                CrossChain::build_deploy_sudt_tx(&args, sender, secp256k1_data_dep)
+            } else if args.tx_type == 2 {
                 println!("create crosschain tx, from ckb to axon");
                 CrossChain::build_ckb_axon_tx(&args, sender, secp256k1_data_dep)
-            } else {
+            } else if args.tx_type == 3 {
                 println!("update crosschain metadata");
                 CrossChain::build_update_crosschain_metadata_tx(&args, sender, secp256k1_data_dep)
+            } else {
+                CrossChain::build_deploy_crosschain_metadata_tx(&args, sender, secp256k1_data_dep)
             }
         };
 
@@ -207,8 +214,137 @@ impl SubCommand for CrossChain {
         Ok(())
     }
 }
+// table Script {
+// code_hash:      Byte32,
+// hash_type:      byte,
+// args:           Bytes,
+// }
+//
+// vector ScriptVec <Script>
+// struct xUDT_Script {
+// code_hash:      Byte32,
+// hash_type:      Byte,
+// args:           Bytes,
+// }
 
 impl CrossChain {
+    fn get_type_script_arg(sender: Script) -> PackedBytes {
+        let xudt_flag = 0x1_u32.to_le_bytes();
+        let xudt_script = Script::new_builder()
+            .code_hash(XUDT_CAP_SCRIPT_CODE_HASH.pack())
+            .hash_type(ScriptHashType::Type.into())
+            .args(sender.args())
+            .build();
+        // let xudt_scripts = vec![xudt_script];
+
+        // let sender_lock_script = sender.calc_script_hash().as_slice();
+
+        let args_len = 32 + 4 + xudt_script.total_size();
+        let mut script_args: Vec<u8> = vec![0u8; args_len];
+        script_args[0..32].copy_from_slice(sender.calc_script_hash().as_slice());
+        script_args[32..36].copy_from_slice(xudt_flag.as_slice());
+        // let xudt_scripts = xudt_scripts.as_slice();
+        script_args[36..].copy_from_slice(xudt_script.as_slice());
+
+        script_args.pack()
+    }
+
+    fn build_deploy_xudt_tx(
+        args: &Args,
+        sender: Script,
+        secp256k1_data_dep: CellDep,
+    ) -> Result<TransactionView, Box<dyn StdErr>> {
+        let mut base_query = CellQueryOptions::new_lock(sender.clone());
+        base_query.data_len_range = Some(ValueRangeOption::new_exact(0));
+        let (input, _, input_cap) = CrossChain::update_input_cells(args, base_query)?;
+
+        let xudt_out_point = OutPoint::new(XUDT_TYPE_SCRIPT_TX_HASH.pack(), 0);
+        let xudt_data_dep = CellDep::new_builder()
+            .out_point(xudt_out_point)
+            .dep_type(DepType::Code.into())
+            .build();
+        let cell_deps = vec![xudt_data_dep, secp256k1_data_dep];
+
+        let lock_script = sender.clone();
+
+        // let type_script_arg = CrossChain::get_type_script_arg(sender.clone());
+        let type_script_arg = sender.calc_script_hash().as_bytes().pack();
+        let type_script = CrossChain::build_script(
+            XUDT_TYPE_SCRIPT_CODE_HASH,
+            ScriptHashType::Type,
+            type_script_arg,
+        );
+        let type_script = ScriptOpt::new_builder().set(Some(type_script)).build();
+
+        // output cell
+        let output = CellOutput::new_builder()
+            .lock(lock_script)
+            .type_(type_script)
+            .capacity((args.capacity * BYTE_SHANNONS).pack())
+            .build();
+        let out_cap: u64 = output.capacity().unpack();
+        println!("out cap {}", out_cap);
+
+        let remain_cap = input_cap - out_cap - TX_FEE;
+        let output1 = CellOutput::new_builder()
+            .lock(sender)
+            .capacity(remain_cap.pack())
+            .build();
+        let outputs = vec![output, output1];
+
+        let xudt_amount = 1024 as u128;
+        let outputs_data = vec![xudt_amount.to_le_bytes().pack(), Bytes::new().pack()];
+
+        CrossChain::build_signed_tx(input, outputs, outputs_data, cell_deps, args)
+    }
+
+    fn build_deploy_sudt_tx(
+        args: &Args,
+        sender: Script,
+        secp256k1_data_dep: CellDep,
+    ) -> Result<TransactionView, Box<dyn StdErr>> {
+        let mut base_query = CellQueryOptions::new_lock(sender.clone());
+        base_query.data_len_range = Some(ValueRangeOption::new_exact(0));
+        let (input, _, input_cap) = CrossChain::update_input_cells(args, base_query)?;
+
+        let sudt_out_point = OutPoint::new(SUDT_TYPE_SCRIPT_TX_HASH.pack(), 0);
+        let sudt_data_dep = CellDep::new_builder()
+            .out_point(sudt_out_point)
+            .dep_type(DepType::Code.into())
+            .build();
+        let cell_deps = vec![sudt_data_dep, secp256k1_data_dep];
+
+        let lock_script = sender.clone();
+        let type_script_args = lock_script.calc_script_hash();
+        let type_script = CrossChain::build_script(
+            SUDT_TYPE_SCRIPT_CODE_HASH,
+            ScriptHashType::Type,
+            type_script_args.as_bytes().pack(),
+        );
+        let type_script = ScriptOpt::new_builder().set(Some(type_script)).build();
+
+        // output cell
+        let output = CellOutput::new_builder()
+            .lock(lock_script)
+            .type_(type_script)
+            .capacity((args.capacity * BYTE_SHANNONS).pack())
+            .build();
+        let out_cap: u64 = output.capacity().unpack();
+        println!("out cap {}", out_cap);
+
+        let remain_cap = input_cap - out_cap - TX_FEE;
+        let output1 = CellOutput::new_builder()
+            .lock(sender)
+            .capacity(remain_cap.pack())
+            .build();
+        let outputs = vec![output, output1];
+
+        let sudt_amount = 256 as u128;
+        let outputs_data = vec![sudt_amount.to_le_bytes().pack(), Bytes::new().pack()];
+
+        CrossChain::build_signed_tx(input, outputs, outputs_data, cell_deps, args)
+    }
+
     fn update_input_cells(
         args: &Args,
         base_query: CellQueryOptions,

@@ -41,9 +41,9 @@ pub const XUDT_TYPE_SCRIPT_TX_HASH: H256 =
 
 // xUDT cap type script, needs to deploy xUDT cap script first
 pub const XUDT_CAP_SCRIPT_CODE_HASH: H256 =
-    h256!("0xd99fd4cc59477273e1cf01df14b80bf5fd83b2e68af3807aa5dece284a74fd12");
+    h256!("0xfba12f4dcf77cfab0a85dea8918a15d11b78e30e533265923017eca8f527d5d6");
 pub const XUDT_CAP_SCRIPT_TX_HASH: H256 =
-    h256!("0xd99fd4cc59477273e1cf01df14b80bf5fd83b2e68af3807aa5dece284a74fd12");
+    h256!("0xba5b6ee4ed3463c88bf400820d33b9c11685077b064b760d765aa116fef04219");
 
 // testnet, secp256k1
 pub const SECP256K1_BLAKE160_CODE_HASH: H256 =
